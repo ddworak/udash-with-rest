@@ -3,12 +3,15 @@ package io.company.app.backend.server
 import io.company.app.backend.rpc.ExposedRpcInterfaces
 import io.company.app.backend.services.DomainServices
 import io.company.app.shared.model.SharedExceptions
-import io.company.app.shared.rpc.server.MainServerRPC
+import io.company.app.shared.rpc.server.{AdditionalRpc, MainServerRPC}
+import io.udash.rest.RestServlet
 import io.udash.rpc._
 import org.eclipse.jetty.server.Server
 import org.eclipse.jetty.server.handler.ContextHandler
 import org.eclipse.jetty.server.session.SessionHandler
 import org.eclipse.jetty.servlet.{DefaultServlet, ServletContextHandler, ServletHolder}
+
+import scala.concurrent.Future
 
 class ApplicationServer(val port: Int, resourceBase: String, domainServices: DomainServices) {
   private val server = new Server(port)
@@ -19,12 +22,19 @@ class ApplicationServer(val port: Int, resourceBase: String, domainServices: Dom
 
   contextHandler.setSessionHandler(new SessionHandler)
   contextHandler.getSessionHandler.addEventListener(new org.atmosphere.cpr.SessionSupport())
+  contextHandler.addServlet(createRestServletHolder, "/rest/*")
   contextHandler.addServlet(atmosphereHolder, "/atm/*")
   contextHandler.addServlet(appHolder, "/*")
   server.setHandler(rewriteHandler)
 
   def start(): Unit = server.start()
   def stop(): Unit = server.stop()
+
+  private def createRestServletHolder = {
+    val holder = new ServletHolder(RestServlet[AdditionalRpc](s => Future.successful(s"pong $s")))
+    holder.setAsyncSupported(true)
+    holder
+  }
 
   private def createAtmosphereHolder() = {
     val config = new DefaultAtmosphereServiceConfig(clientId =>
@@ -57,14 +67,13 @@ class ApplicationServer(val port: Int, resourceBase: String, domainServices: Dom
   }
 
   private def createRewriteHandler(context: ContextHandler) = {
-    import org.eclipse.jetty.rewrite.handler.RewriteRegexRule
-    import org.eclipse.jetty.rewrite.handler.RewriteHandler
+    import org.eclipse.jetty.rewrite.handler.{RewriteHandler, RewriteRegexRule}
     val rewrite = new RewriteHandler()
     rewrite.setRewriteRequestURI(true)
     rewrite.setRewritePathInfo(false)
 
     val spaRewrite = new RewriteRegexRule
-    spaRewrite.setRegex("^/(?!assets|scripts|styles|atm)(.*/?)*$")
+    spaRewrite.setRegex("^/(?!assets|scripts|styles|atm|rest)(.*/?)*$")
     spaRewrite.setReplacement("/")
     rewrite.addRule(spaRewrite)
     rewrite.setHandler(context)

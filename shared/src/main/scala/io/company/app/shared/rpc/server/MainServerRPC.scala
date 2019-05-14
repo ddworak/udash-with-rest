@@ -4,7 +4,10 @@ import io.company.app.shared.model.auth.UserToken
 import io.company.app.shared.rpc.server.open.AuthRPC
 import io.company.app.shared.rpc.server.secure.SecureRPC
 import io.udash.i18n._
+import io.udash.rest.DefaultRestApiCompanion
 import io.udash.rpc._
+
+import scala.concurrent.Future
 
 trait MainServerRPC {
   /** Returns an RPC for authentication. */
@@ -18,3 +21,8 @@ trait MainServerRPC {
 }
 
 object MainServerRPC extends DefaultServerRpcCompanion[MainServerRPC]
+
+trait AdditionalRpc {
+  def ping(s: String): Future[String]
+}
+object AdditionalRpc extends DefaultRestApiCompanion[AdditionalRpc]
